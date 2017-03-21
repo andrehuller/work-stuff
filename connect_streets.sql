@@ -39,7 +39,8 @@ BEGIN
 	AND	(t1.st_name IS NULL AND t2.st_name IS NULL OR t1.st_name = t2.st_name)
 	AND	(t1.zip_code IS NULL AND t2.zip_code IS NULL OR t1.zip_code = t2.zip_code)
 	AND	(t1.oneway IS NULL AND t2.oneway IS NULL OR t1.oneway = t2.oneway)
-	AND	streetbase.GEO_Angle(t1.geom, t2.geom) > radians(155); -- (180 - 25) AVOIDS RETURNS
+	AND	streetbase.GEO_Angle(t1.geom, t2.geom) > radians(155) -- (180 - 25) AVOIDS RETURNS
+	AND	ST_GeometryType(ST_Intersection(t1.geom, t2.geom)) = 'ST_Point'; --ST_MultiPoint IN SOME CASES
 
 	--REMOVE BIFURCAÇÕES
 	DELETE	FROM streetbase.tb_connected_streets t
