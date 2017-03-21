@@ -7,19 +7,19 @@ DECLARE	cursor_connected CURSOR FOR
 		SELECT	id
 		FROM	streetbase.tb_geo_eixos_viarios_separados_pol_p4674
 		WHERE	city_id = a_city_id
-		AND	st_id IS NULL;
+		AND	connected_id IS NULL;
 	var_group_id INTEGER := 1;
 	var_group_id1 INTEGER;
 	var_group_id2 INTEGER;
-	var_st_id INTEGER;
+	var_connected_id INTEGER;
 BEGIN
 	DELETE	FROM streetbase.tb_geo_eixos_viarios_conectados_pol_p4674
 	WHERE	city_id = a_city_id;
 
 	UPDATE	streetbase.tb_geo_eixos_viarios_separados_pol_p4674
-	SET	st_id = NULL
+	SET	connected_id = NULL
 	WHERE	city_id = a_city_id
-	AND	st_id IS NOT NULL;
+	AND	connected_id IS NOT NULL;
 
 	DELETE	FROM streetbase.tb_connected_street;
 
@@ -63,7 +63,7 @@ BEGIN
 		INTO	var_group_id2
 		FROM	streetbase.tb_connected_street
 		WHERE	id = var_record.id2;
-		
+
 		IF var_group_id1 IS NULL AND var_group_id2 IS NULL THEN
 			INSERT	INTO streetbase.tb_connected_street(id, group_id)
 			VALUES	(var_record.id1, var_group_id),
@@ -87,19 +87,19 @@ BEGIN
 	END LOOP;
 
 	SELECT	COALESCE(MAX(id), 0) + 1
-	INTO	var_st_id
+	INTO	var_connected_id
 	FROM	streetbase.tb_geo_eixos_viarios_conectados_pol_p4674;
 
 	UPDATE	streetbase.tb_geo_eixos_viarios_separados_pol_p4674 t
-	SET	st_id = var_st_id + t1.group_id
+	SET	connected_id = var_connected_id + t1.group_id
 	FROM	streetbase.tb_connected_street t1
 	WHERE	t.id = t1.id;
 
-	INSERT	INTO streetbase.tb_geo_eixos_viarios_conectados_pol_p4674(city_id, id,
+	INSERT	INTO streetbase.tb_geo_eixos_viarios_conectados_pol_p4674(city_id, city, id,
 		zip_code, st_type, st_title, st_name,
 		oneway,
 		min_num, max_num, geom)
-	SELECT	city_id, st_id,
+	SELECT	city_id, city, connected_id,
 		zip_code, st_type, st_title, st_name,
 		oneway,
 		MIN(LEAST(from_l, to_l, from_r, to_r)),
@@ -107,21 +107,21 @@ BEGIN
 		ST_LineMerge(ST_Union(geom))
 	FROM	streetbase.tb_geo_eixos_viarios_separados_pol_p4674
 	WHERE	city_id = a_city_id
-	AND	st_id IS NOT NULL
-	GROUP	BY city_id, st_id,
+	AND	connected_id IS NOT NULL
+	GROUP	BY city_id, city, connected_id,
 		zip_code, st_type, st_title, st_name,
 		oneway;
 
 	SELECT	COALESCE(MAX(id), 0) + 1
-	INTO	var_st_id
+	INTO	var_connected_id
 	FROM	streetbase.tb_geo_eixos_viarios_conectados_pol_p4674;
 
 	FOR var_record IN cursor_separated LOOP
-		INSERT	INTO streetbase.tb_geo_eixos_viarios_conectados_pol_p4674(city_id, id,
+		INSERT	INTO streetbase.tb_geo_eixos_viarios_conectados_pol_p4674(city_id, city, id,
 			zip_code, st_type, st_title, st_name,
 			oneway,
 			min_num, max_num, geom)
-		SELECT	city_id, var_st_id,
+		SELECT	city_id, city, var_connected_id,
 			zip_code, st_type, st_title, st_name,
 			oneway,
 			LEAST(from_l, to_l, from_r, to_r),
@@ -130,7 +130,7 @@ BEGIN
 		FROM	streetbase.tb_geo_eixos_viarios_separados_pol_p4674
 		WHERE	id = var_record.id;
 
-		var_st_id := var_st_id + 1;
+		var_connected_id := var_connected_id + 1;
 	END LOOP;
 
 	DELETE	FROM streetbase.tb_connected_street;
