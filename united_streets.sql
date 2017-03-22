@@ -1,27 +1,14 @@
 CREATE OR REPLACE FUNCTION streetbase.GEO_United_Streets(a_city_id INTEGER)
 	RETURNS VOID AS $$
 DECLARE	cursor_connected CURSOR FOR
-		SELECT	t1.id AS id1, t2.id AS id2
-		FROM	streetbase.tb_geo_eixos_viarios_conectados_pol_p4674 t1,
-			streetbase.tb_geo_eixos_viarios_conectados_pol_p4674 t2
-		WHERE	t1.city_id = a_city_id
-		AND	t2.city_id = a_city_id
-		AND	ST_Touches(t1.geom, t2.geom)
-		AND	t1.id < t2.id --IGNORE REPEATED
-		AND	(t1.st_type IS NULL AND t2.st_type IS NULL OR t1.st_type = t2.st_type)
-		AND	(t1.st_title IS NULL AND t2.st_title IS NULL OR t1.st_title = t2.st_title)
-		AND	(t1.st_name IS NULL AND t2.st_name IS NULL OR t1.st_name = t2.st_name)
-		AND	(t1.alt_st_name IS NULL AND t2.alt_st_name IS NULL OR t1.alt_st_name = t2.alt_st_name)
-		AND	(t1.zip_code IS NULL AND t2.zip_code IS NULL OR t1.zip_code = t2.zip_code)
-		AND	(t1.oneway IS NULL AND t2.oneway IS NULL OR t1.oneway = t2.oneway)
-		AND	abs(radians(180) - streetbase.GEO_Angle(t1.geom, t2.geom)) < radians(25)
-		AND	streetbase.GEO_Angle(t1.geom, t2.geom) > radians(90); --EVITA RETORNOS
+		SELECT	id1, id2
+		FROM	streetbase.tb_united_streets;
 	cursor_separated CURSOR FOR
 		SELECT	t.id
 		FROM	streetbase.tb_geo_eixos_viarios_conectados_pol_p4674 t
 		WHERE	t.city_id = a_city_id
 		AND	t.united_id IS NULL
-		AND	NOT EXISTS (	SELECT	1
+		AND	NOT EXISTS    (	SELECT	1
 					FROM	streetbase.tb_united_street t1
 					WHERE	t1.id = t.id );
 	var_group_id INTEGER := 1;
@@ -38,6 +25,34 @@ BEGIN
 	AND	united_id IS NOT NULL;
 
 	DELETE	FROM streetbase.tb_united_street;
+
+	DELETE	FROM streetbase.tb_united_streets;
+
+	INSERT	INTO streetbase.tb_united_streets(id1, id2, edge, geom)
+	SELECT	t1.id, t2.id, ARRAY[t1.id, t2.id], ST_Intersection(t1.geom, t2.geom)
+	FROM	streetbase.tb_geo_eixos_viarios_conectados_pol_p4674 t1,
+		streetbase.tb_geo_eixos_viarios_conectados_pol_p4674 t2
+	WHERE	t1.city_id = a_city_id
+	AND	t2.city_id = a_city_id
+	AND	ST_Touches(t1.geom, t2.geom)
+	AND	t1.id < t2.id --IGNORE REPEATED
+	AND	(t1.st_type IS NULL AND t2.st_type IS NULL OR t1.st_type = t2.st_type)
+	AND	(t1.st_title IS NULL AND t2.st_title IS NULL OR t1.st_title = t2.st_title)
+	AND	(t1.st_name IS NULL AND t2.st_name IS NULL OR t1.st_name = t2.st_name)
+	AND	(t1.alt_st_name IS NULL AND t2.alt_st_name IS NULL OR t1.alt_st_name = t2.alt_st_name)
+	AND	(t1.zip_code IS NULL AND t2.zip_code IS NULL OR t1.zip_code = t2.zip_code)
+	AND	(t1.oneway IS NULL AND t2.oneway IS NULL OR t1.oneway = t2.oneway)
+	AND	streetbase.GEO_Angle(t1.geom, t2.geom) > radians(155) -- (180 - 25) AVOIDS RETURNS
+	AND	ST_GeometryType(ST_Intersection(t1.geom, t2.geom)) = 'ST_Point'; --ST_MultiPoint IN SOME CASES
+
+	--REMOVE BIFURCAÇÕES
+	DELETE	FROM streetbase.tb_united_streets t
+	WHERE	t.id IN       (	SELECT	t1.id
+				FROM	streetbase.tb_united_streets t1,
+					streetbase.tb_united_streets t2
+				WHERE	ST_Equals(t1.geom, t2.geom)
+				AND	t1.edge && t2.edge --A OVERLAPS B BUT A DOES NOT CONTAIN B
+				AND	NOT t1.edge @> t2.edge );
 
 	FOR var_record IN cursor_connected LOOP
 		SELECT	group_id
@@ -88,25 +103,26 @@ BEGIN
 	FROM	streetbase.tb_united_street t1
 	WHERE	t.id = t1.id;
 
-	-- oneway ??
-	INSERT	INTO streetbase.tb_geo_eixos_viarios_unidos_pol_p4674(city_id, id,
+	INSERT	INTO streetbase.tb_geo_eixos_viarios_unidos_pol_p4674(city_id, city, id,
 		st_type, st_title, st_name, alt_st_name,
-		zip_code,
+		zip_code, oneway,
 		min_num, max_num, geom)
-	SELECT	city_id, united_id,
+	SELECT	city_id, city, united_id,
 		st_type, st_title, st_name, alt_st_name,
-		zip_code,
+		zip_code, oneway,
 		MIN(min_num),
 		MAX(max_num),
 		ST_LineMerge(ST_Union(geom))
 	FROM	streetbase.tb_geo_eixos_viarios_conectados_pol_p4674
 	WHERE	city_id = a_city_id
 	AND	united_id IS NOT NULL
-	GROUP	BY city_id, united_id,
+	GROUP	BY city_id, city, united_id,
 		st_type, st_title, st_name, alt_st_name,
 		zip_code, oneway;
 
 	DELETE	FROM streetbase.tb_united_street;
+
+	DELETE	FROM streetbase.tb_united_streets;
 
 	--GEO_Update_Osm_Name
 	UPDATE	streetbase.tb_geo_eixos_viarios_unidos_pol_p4674
