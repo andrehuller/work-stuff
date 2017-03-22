@@ -26,8 +26,8 @@ BEGIN
 	DELETE	FROM streetbase.tb_connected_streets;
 
 	--INSERE NA LISTA DE ADJACÊNCIA
-	INSERT	INTO streetbase.tb_connected_streets(id1, id2, geom)
-	SELECT	t1.id, t2.id, ST_Intersection(t1.geom, t2.geom)
+	INSERT	INTO streetbase.tb_connected_streets(id1, id2, edge, geom)
+	SELECT	t1.id, t2.id, ARRAY[t1.id, t2.id], ST_Intersection(t1.geom, t2.geom)
 	FROM	streetbase.tb_geo_eixos_viarios_separados_pol_p4674 t1,
 		streetbase.tb_geo_eixos_viarios_separados_pol_p4674 t2
 	WHERE	t1.city_id = a_city_id
@@ -37,6 +37,7 @@ BEGIN
 	AND	(t1.st_type IS NULL AND t2.st_type IS NULL OR t1.st_type = t2.st_type)
 	AND	(t1.st_title IS NULL AND t2.st_title IS NULL OR t1.st_title = t2.st_title)
 	AND	(t1.st_name IS NULL AND t2.st_name IS NULL OR t1.st_name = t2.st_name)
+	AND	(t1.alt_st_name IS NULL AND t2.alt_st_name IS NULL OR t1.alt_st_name = t2.alt_st_name)
 	AND	(t1.zip_code IS NULL AND t2.zip_code IS NULL OR t1.zip_code = t2.zip_code)
 	AND	(t1.oneway IS NULL AND t2.oneway IS NULL OR t1.oneway = t2.oneway)
 	AND	streetbase.GEO_Angle(t1.geom, t2.geom) > radians(155) -- (180 - 25) AVOIDS RETURNS
@@ -44,14 +45,12 @@ BEGIN
 
 	--REMOVE BIFURCAÇÕES
 	DELETE	FROM streetbase.tb_connected_streets t
-	USING ( SELECT	t1.id1, t1.id2
-		FROM	streetbase.tb_connected_streets t1,
-			streetbase.tb_connected_streets t2
-		WHERE	ST_Equals(t1.geom, t2.geom)
-		AND	ARRAY[t1.id1, t1.id2] && ARRAY[t2.id1, t2.id2] --A OVERLAPS B BUT A DOES NOT CONTAIN B
-		AND	NOT ARRAY[t1.id1, t1.id2] @> ARRAY[t2.id1, t2.id2] ) s
-	WHERE	t.id1 = s.id1
-	AND	t.id2 = s.id2;
+	WHERE	t.id IN       (	SELECT	t1.id
+				FROM	streetbase.tb_connected_streets t1,
+					streetbase.tb_connected_streets t2
+				WHERE	ST_Equals(t1.geom, t2.geom)
+				AND	t1.edge && t2.edge --A OVERLAPS B BUT A DOES NOT CONTAIN B
+				AND	NOT t1.edge @> t2.edge );
 
 	FOR var_record IN cursor_connected LOOP
 		SELECT	group_id
