@@ -1,19 +1,19 @@
-CREATE OR REPLACE FUNCTION streetbase.GEO_Street_Direction(geom GEOMETRY)
-	RETURNS INTEGER AS $$
-DECLARE dx INTEGER;
-	dy INTEGER;
+----------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION streetbase.GEO_Street_Direction(geom geometry)
+	RETURNS integer AS $$
+DECLARE dx integer; dy integer;
 BEGIN
-	IF ST_X(ST_EndPoint(geom)) > ST_X(ST_StartPoint(geom)) THEN
+	IF ST_X(ST_StartPoint(geom)) > ST_X(ST_EndPoint(geom)) THEN
 		dx := 1;
-	ELSIF ST_X(ST_EndPoint(geom)) < ST_X(ST_StartPoint(geom)) THEN
+	ELSIF ST_X(ST_StartPoint(geom)) < ST_X(ST_EndPoint(geom)) THEN
 		dx := -1;
 	ELSE
 		dx := 0;
 	END IF;
 
-	IF ST_Y(ST_EndPoint(geom)) > ST_Y(ST_StartPoint(geom)) THEN
+	IF ST_Y(ST_StartPoint(geom)) > ST_Y(ST_EndPoint(geom)) THEN
 		dy := 1;
-	ELSIF ST_Y(ST_EndPoint(geom)) < ST_Y(ST_StartPoint(geom)) THEN
+	ELSIF ST_Y(ST_StartPoint(geom)) < ST_Y(ST_EndPoint(geom)) THEN
 		dy := -1;
 	ELSE
 		dy := 0;
@@ -40,3 +40,4 @@ BEGIN
 	END IF;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
+----------------------------------------------------------------------------------------------------
