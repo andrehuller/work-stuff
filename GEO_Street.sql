@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION streetbase.GEO_Street(a_name TEXT,
 	OUT st_type text, OUT st_title text, OUT st_name text, OUT completed boolean)
 AS $$
-DECLARE	curs1 CURSOR FOR
+DECLARE	cursor_tokens CURSOR FOR
 	WITH split_string AS (
 		SELECT *
 		FROM (SELECT regexp_split_to_table(regexp_replace(lower(unaccent(trim(a_name || ' eof'))), '[\.,\,,\:,-]', ' ', 'g'), E'\\s+') AS token) t
@@ -20,13 +20,11 @@ DECLARE	curs1 CURSOR FOR
 	st_alt_name text;
 	var_actions text[];
 BEGIN
---	RAISE INFO '%', a_name;
-
 	var_step := 1;
 	st_type := NULL;
 	st_title := NULL;
 	st_name := NULL;
-	FOR var_record IN curs1 LOOP
+	FOR var_record IN cursor_tokens LOOP
 		SELECT	next_step, actions
 		INTO	var_step, var_actions
 		FROM	streetbase.tb_street_step
