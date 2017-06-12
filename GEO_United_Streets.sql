@@ -194,6 +194,7 @@ BEGIN
 		AND	ts.connected_id = tc.id
 		AND	LEAST(ts.from_l, ts.from_r) IS NULL
 		AND	GREATEST(ts.to_l, ts.to_r) IS NULL
+		AND	ST_GeometryType(tc.geom) = 'ST_LineString'
 	)
 	UPDATE	streetbase.tb_geo_eixos_viarios_separados_pol_p4674 ts
 	SET	from_l = st_number.from_l,
